@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "vae"
+version = "0.1.0"
+description = "Variational AutoEncoder"
+authors = ["Cem Alpturk <cem.alpturk@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = "^2.1.1"
+matplotlib = "^3.9.2"
+torch = "^2.4.1"
+tqdm = "^4.66.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+black = "^24.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
