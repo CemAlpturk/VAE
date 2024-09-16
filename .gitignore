@@ -1,5 +1,15 @@
+# Virtual env
 .venv
+
+# pycache
 **/__pycache__
-.pytest_cache 
+.pytest_cache
+
+# VSCode
 .vscode 
+
+# MacOS
 **/.DS_Store
+
+# Datasets
+data
