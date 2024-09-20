@@ -164,6 +164,7 @@ class VAE(nn.Module):
 
         return samples
 
+    @torch.no_grad()
     def generate(self, x: Tensor) -> Tensor:
         """
         Given a data point x, return the reconstructed image.
