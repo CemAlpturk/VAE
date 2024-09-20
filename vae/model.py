@@ -74,9 +74,10 @@ class VAE(nn.Module):
         n_in: int,
         n_latent: int,
         hidden_dims: Sequence[int] = (),
+        name: str = "VAE",
     ) -> None:
         super().__init__()
-        self.n_latent = n_latent
+        self.name = name
 
         # Build encoder
         self.encoder = Encoder(

@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 
 import numpy as np
 
@@ -13,6 +14,13 @@ from tqdm import tqdm
 from model import VAE
 from datasets import MNISTDataset
 from configs import ModelConfig, TrainConfig
+
+MODEL_DIR = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "models",
+    )
+)
 
 
 def loss_fn(
@@ -57,7 +65,6 @@ def train(
 
     metrics = defaultdict(list)
     step = 0
-    logging_steps = 10
     batch_iter = iter(train_dataloader)
 
     # Training loop
@@ -77,7 +84,7 @@ def train(
         opt.step()
         opt.zero_grad()
 
-        if step % logging_steps == 0:
+        if step % train_config.logging_steps == 0:
             metrics["steps"].append(step)
             metrics["train_loss"].append(loss.item())
             metrics["train_recon_loss"].append(train_losses["recon_loss"].item())

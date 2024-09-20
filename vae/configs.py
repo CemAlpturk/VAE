@@ -12,3 +12,4 @@ class TrainConfig:
     lr: float
     batch_size: int
     steps: int
+    logging_steps: int
