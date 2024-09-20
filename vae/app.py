@@ -16,12 +16,12 @@ from dash import dcc, html
 from dash import Input, Output, State
 import dash_bootstrap_components as dbc
 
-from model import VAE
+from vae.model import VAE
 
 # from datasets import MNISTDataset
 # from resolve_dataset import mnist
-from train import train
-from configs import ModelConfig, TrainConfig
+from vae.train import train
+from vae.configs import ModelConfig, TrainConfig
 
 
 pio.templates.default = "plotly_dark"
@@ -108,15 +108,22 @@ class App:
             Input("learning-rate-input", "value"),
             Input("batch-size-input", "value"),
             Input("steps-input", "value"),
+            Input("logging-steps-input", "value"),
         )
         def update_train_config(
             lr: float,
             batch_size: int,
             steps: int,
+            logging_steps: int,
         ) -> dict[str, Any]:
             # TODO: Input validation
 
-            return {"lr": lr, "batch_size": batch_size, "steps": steps}
+            return {
+                "lr": lr,
+                "batch_size": batch_size,
+                "steps": steps,
+                "logging_steps": logging_steps,
+            }
 
         @self.app.callback(
             Output("train-metrics-store", "data"),
@@ -139,6 +146,7 @@ class App:
                 lr=_train_config["lr"],
                 batch_size=_train_config["batch_size"],
                 steps=_train_config["steps"],
+                logging_steps=_train_config["logging_steps"],
             )
 
             train_stats = train(
@@ -433,6 +441,19 @@ class App:
                                                 dbc.Input(
                                                     id="steps-input",
                                                     value=10000,
+                                                    min=1,
+                                                    step=1,
+                                                    type="number",
+                                                ),
+                                            ],
+                                            className="mb-3",
+                                        ),
+                                        dbc.InputGroup(
+                                            [
+                                                dbc.InputGroupText("Logging steps"),
+                                                dbc.Input(
+                                                    id="logging-steps-input",
+                                                    value=10,
                                                     min=1,
                                                     step=1,
                                                     type="number",

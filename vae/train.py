@@ -11,9 +11,9 @@ from torch.utils.data import DataLoader, Dataset
 
 from tqdm import tqdm
 
-from model import VAE
-from datasets import MNISTDataset
-from configs import ModelConfig, TrainConfig
+from vae.model import VAE
+from vae.datasets import MNISTDataset
+from vae.configs import ModelConfig, TrainConfig
 
 MODEL_DIR = os.path.abspath(
     os.path.join(
