@@ -88,13 +88,17 @@ def train(
     async_saver = concurrent.futures.ThreadPoolExecutor()
 
     # Training loop
-    for epoch in tqdm(range(train_config.max_epochs), position=1):
+    for epoch in tqdm(range(train_config.max_epochs), position=0, desc="Epoch"):
         epoch_train_loss = 0
         epoch_train_recon_loss = 0
         epoch_train_kld_loss = 0
 
         for batch_idx, (xs, _) in tqdm(
-            enumerate(train_dataloader), position=0, leave=False
+            enumerate(train_dataloader),
+            position=1,
+            leave=False,
+            total=len(train_dataloader),
+            desc="Step",
         ):
 
             opt.zero_grad()
