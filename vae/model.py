@@ -33,7 +33,7 @@ class Encoder(nn.Module):
             x = F.relu(layer(x))
 
         mu = self.mu(x)
-        logvar = F.softplus(self.logvar(x))
+        logvar = self.logvar(x)
 
         return mu, logvar
 
@@ -140,14 +140,14 @@ class VAE(nn.Module):
 
         return eps * std + mu
 
-    def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+    def forward(self, x: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """Forward pass"""
 
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         x_hat = self.decode(z)
 
-        return x_hat, x, mu, logvar
+        return x_hat, mu, logvar
 
     def sample(self, num_samples: int) -> Tensor:
         """

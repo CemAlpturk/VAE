@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import os
+import json
 
 import numpy as np
 
@@ -13,7 +14,7 @@ import plotly.io as pio
 
 import dash
 from dash import dcc, html
-from dash import Input, Output, State
+from dash import Input, Output, State, Patch
 import dash_bootstrap_components as dbc
 
 from vae.model import VAE
@@ -25,6 +26,8 @@ from vae.configs import ModelConfig, TrainConfig
 
 
 pio.templates.default = "plotly_dark"
+
+INTERVAL = 1000  # ms
 
 
 class App:
@@ -39,10 +42,6 @@ class App:
         self.app.layout = self.layout()
 
         # Datasets
-        # dataset = mnist("data")
-        # self.train_dataset = MNISTDataset(
-        #     imgs=dataset["train_images"], labels=dataset["train_labels"]
-        # )
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),  # Convert image to tensor
@@ -74,6 +73,46 @@ class App:
         )
 
         self.model = model
+
+    def _init_loss_fig(self) -> go.Figure:
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=[],
+                y=[],
+                mode="lines",
+                name="Total loss",
+            ),
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=[],
+                y=[],
+                mode="lines",
+                name="Reconstruction loss",
+            ),
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=[],
+                y=[],
+                mode="lines",
+                name="KL loss",
+            ),
+        )
+
+        fig.update_layout(
+            title="Losses",
+            title_x=0.5,
+            xaxis_title="Epochs",
+            yaxis_title="Loss",
+            yaxis_type="log",
+        )
+
+        return fig
 
     def register_callbacks(self) -> None:
 
@@ -107,26 +146,23 @@ class App:
             Output("train-config-store", "data"),
             Input("learning-rate-input", "value"),
             Input("batch-size-input", "value"),
-            Input("steps-input", "value"),
-            Input("logging-steps-input", "value"),
+            Input("max-epochs-input", "value"),
         )
         def update_train_config(
             lr: float,
             batch_size: int,
-            steps: int,
-            logging_steps: int,
+            max_epochs: int,
         ) -> dict[str, Any]:
             # TODO: Input validation
 
             return {
                 "lr": lr,
                 "batch_size": batch_size,
-                "steps": steps,
-                "logging_steps": logging_steps,
+                "max_epochs": max_epochs,
             }
 
         @self.app.callback(
-            Output("train-metrics-store", "data"),
+            Output("dummy-store", "data"),
             Input("start-train-button", "n_clicks"),
             State("train-config-store", "data"),
             State("model-config-store", "data"),
@@ -145,77 +181,69 @@ class App:
             train_config = TrainConfig(
                 lr=_train_config["lr"],
                 batch_size=_train_config["batch_size"],
-                steps=_train_config["steps"],
-                logging_steps=_train_config["logging_steps"],
+                max_epochs=_train_config["max_epochs"],
             )
 
-            train_stats = train(
+            # TODO: Call this asynchronously
+            train(
                 model=self.model,
                 train_dataset=self.train_dataset,
                 test_dataset=self.train_dataset,
                 train_config=train_config,
             )
 
-            return train_stats
+            return {}
+
+        @self.app.callback(
+            Output("train-metrics-store", "data"),
+            Input("interval", "n_intervals"),
+            State("train-metrics-store", "data"),
+        )
+        def update_metrics(
+            interval: int,
+            curr_metrics: dict[str, Any],
+        ) -> dict[str, Any]:
+
+            metrics_path = os.path.abspath(
+                os.path.join(
+                    os.path.dirname(__file__),
+                    "../models/VAE/metrics.json",
+                )
+            )
+            if not os.path.exists(metrics_path):
+                return dash.no_update  # type: ignore
+
+            with open(metrics_path, "r") as f:
+                metrics = json.load(f)
+
+            # Check if metrics have changed
+            if curr_metrics is not None and metrics == curr_metrics:
+                return dash.no_update  # type: ignore
+
+            return metrics
 
         @self.app.callback(
             Output("loss-fig", "figure"),
             Input("train-metrics-store", "data"),
             prevent_initial_call=True,
         )
-        def plot_losses(metrics: dict[str, Any] | None) -> go.Figure:
+        def plot_losses(metrics: dict[str, Any] | None) -> Patch:
             if metrics is None:
-                return go.Figure()
-            steps = metrics["steps"]
-            train_loss = metrics["train_loss"]
-            train_recon_loss = metrics["train_recon_loss"]
-            train_kl_loss = metrics["train_kld_loss"]
+                return dash.no_update  # type: ignore
 
-            fig = make_subplots(
-                rows=1,
-                cols=1,
-                shared_xaxes=True,
-            )
+            epochs = metrics["epochs"]
+            epoch_train_loss = metrics["epoch_train_loss"]
+            epoch_train_recon_loss = metrics["epoch_train_recon_loss"]
+            epoch_train_kld_loss = metrics["epoch_train_kld_loss"]
 
-            fig.add_trace(
-                go.Scatter(
-                    x=steps,
-                    y=train_loss,
-                    mode="lines",
-                    name="Total loss",
-                ),
-                row=1,
-                col=1,
-            )
+            fig = Patch()
 
-            fig.add_trace(
-                go.Scatter(
-                    x=steps,
-                    y=train_recon_loss,
-                    mode="lines",
-                    name="Reconstruction loss",
-                ),
-                row=1,
-                col=1,
-            )
-
-            fig.add_trace(
-                go.Scatter(
-                    x=steps,
-                    y=train_kl_loss,
-                    mode="lines",
-                    name="KL loss",
-                ),
-                row=1,
-                col=1,
-            )
-
-            fig.update_layout(
-                title="Losses",
-                title_x=0.5,
-                xaxis_title="Steps",
-                yaxis_title="Loss",
-            )
+            fig["data"][0]["x"] = epochs
+            fig["data"][0]["y"] = epoch_train_loss
+            fig["data"][1]["x"] = epochs
+            fig["data"][1]["y"] = epoch_train_recon_loss
+            fig["data"][2]["x"] = epochs
+            fig["data"][2]["y"] = epoch_train_kld_loss
 
             return fig
 
@@ -227,10 +255,10 @@ class App:
             if metrics is None or self.model is None:
                 return go.Figure()
 
+            # TODO: Optimize this
+
             # Select random samples from training data
             n = 4
-            # idxs = np.random.choice(len(self.train_dataset), n)
-            # samples = self.train_dataset[idxs][0]
             dataloader = DataLoader(self.train_dataset, batch_size=n, shuffle=True)
             samples = next(iter(dataloader))[0]
             reconstructions = self.model.generate(samples)
@@ -287,6 +315,14 @@ class App:
     def _training_tab(self) -> html.Div:
         layout = html.Div(
             children=[
+                dcc.Interval(
+                    id="interval",
+                    interval=INTERVAL,
+                ),
+                dcc.Store(
+                    id="dummy-store",
+                    data=None,
+                ),
                 dcc.Store(
                     id="train-metrics-store",
                     data=None,
@@ -304,7 +340,7 @@ class App:
                         dbc.CardBody(
                             dcc.Graph(
                                 id="loss-fig",
-                                figure=go.Figure(),
+                                figure=self._init_loss_fig(),
                             ),
                         ),
                     ),
@@ -346,7 +382,6 @@ class App:
                     ],
                     style={
                         "grid-area": "buttons",
-                        # "display": "flex",
                     },
                     className="gap-10",
                 ),
@@ -394,7 +429,7 @@ class App:
                                                 dbc.InputGroupText("Hidden Layers"),
                                                 dbc.Input(
                                                     id="hidden-layers-input",
-                                                    value="100, 50",
+                                                    value="400,200",
                                                     type="str",
                                                 ),
                                             ],
@@ -437,23 +472,10 @@ class App:
                                         ),
                                         dbc.InputGroup(
                                             [
-                                                dbc.InputGroupText("Steps"),
+                                                dbc.InputGroupText("Max epochs"),
                                                 dbc.Input(
-                                                    id="steps-input",
-                                                    value=10000,
-                                                    min=1,
-                                                    step=1,
-                                                    type="number",
-                                                ),
-                                            ],
-                                            className="mb-3",
-                                        ),
-                                        dbc.InputGroup(
-                                            [
-                                                dbc.InputGroupText("Logging steps"),
-                                                dbc.Input(
-                                                    id="logging-steps-input",
-                                                    value=10,
+                                                    id="max-epochs-input",
+                                                    value=50,
                                                     min=1,
                                                     step=1,
                                                     type="number",
